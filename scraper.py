@@ -5,7 +5,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
-from supabase import create_client, Client
+
+from context import QueryContext, get_query_context_list
+from db import get_db_connection
 
 import statistics
 import os
@@ -18,27 +20,6 @@ DELIMITER_LAZADA = '%20'
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-
-class QueryContext():
-    def __init__(self, query_terms: list[str], exclude_terms: list[str]) -> None:
-        self.query_terms = query_terms
-        self.exclude_terms = exclude_terms
-
-def get_db_connection() -> Client:
-    client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    return client
-
-def get_query_context_list(client: Client) -> list[QueryContext]:
-    context_list = []
-    query_strings = client.table('queries').select('query_string').execute().data
-    if len(query_strings) == 0:
-        print("No query strings in DB yet!")
-        return
-    for query in query_strings:
-        query_terms = query.get('query_string', '').split(' ')
-        exclude_terms = query.get('exclude_string', '').split(' ')
-        context_list.append(QueryContext(query_terms, exclude_terms))
-    return context_list
 
 def init_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
@@ -120,12 +101,13 @@ def scrape_amazon(driver: webdriver.Chrome, context: QueryContext) -> None:
                     Median Price: {statistics.median(prices)}, \
                     Mean Price: {statistics.mean(prices)}')
 
-try:
-    client = get_db_connection()
-    context_list = get_query_context_list(client)
-    driver: webdriver.Chrome = init_driver()
-    for ctx in context_list:
-        scrape_lazada(driver, ctx)
-        scrape_amazon(driver, ctx)
-finally:
-    driver.quit()
+if __name__ == '__main__':
+    try:
+        client = get_db_connection(url=SUPABASE_URL, key=SUPABASE_KEY)
+        context_list = get_query_context_list(client)
+        driver: webdriver.Chrome = init_driver()
+        for ctx in context_list:
+            scrape_lazada(driver, ctx)
+            scrape_amazon(driver, ctx)
+    finally:
+        driver.quit()
