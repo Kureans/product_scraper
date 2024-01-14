@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 
 from supabase import Client
+from dotenv import load_dotenv
 
 from context import QueryContext, get_query_context_list
 from db import get_db_connection
@@ -18,13 +19,15 @@ from datetime import timezone
 import datetime
 
 
-TIMEOUT_SECONDS = 5
+
 BASE_URL_AMAZON = 'https://www.amazon.sg/s?k='
 DELIMITER_AMAZON = '+'
 
 BASE_URL_LAZADA = 'https://www.lazada.sg/catalog/?q='
 DELIMITER_LAZADA = '%20'
 
+load_dotenv()
+TIMEOUT_SECONDS = os.environ.get("WEBDRIVER_TIMEOUT_SECONDS")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
@@ -56,7 +59,11 @@ def price_stats_to_prices_row_entry(stat: PriceStats):
 
 def init_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('headless')
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('window-size=1400,2100')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--disable-dev-shm-usage')
     driver = webdriver.Chrome(options=chrome_options, service=ChromeService(ChromeDriverManager().install()))
     driver.set_page_load_timeout(TIMEOUT_SECONDS)
     return driver
@@ -135,9 +142,7 @@ def scrape_amazon(driver: webdriver.Chrome, context: QueryContext, client: Clien
                 dollars, cents, *metadata = price_string.split('\n', 2)
                 price_value = int(dollars[1:]) + (int(cents[:2]) / 100)
                 prices.append(price_value)
-            
-            
-            
+                 
             stats = PriceStats(
                 id=context.id,
                 lowest=min(prices), 
