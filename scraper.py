@@ -6,6 +6,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 
+from supabase import Client
+
 from context import QueryContext, get_query_context_list
 from db import get_db_connection
 
@@ -21,6 +23,21 @@ DELIMITER_LAZADA = '%20'
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
+class PriceStats():
+    def __init__(self, id, lowest, highest, median, mean) -> None:
+        self.query_id = id
+        self.lowest = lowest
+        self.highest = highest
+        self.median = median
+        self.mean = mean
+
+    def __repr__(self):
+        return f'Query ID: {self.query_id}, \
+                    Highest Price: {self.highest}, \
+                    Lowest Price: {self.lowest}, \
+                    Median Price: {self.median}, \
+                    Mean Price: {self.mean}'
+        
 def init_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument('headless')
@@ -35,7 +52,7 @@ def get_full_query_url(base_url, delimiter, query_terms):
     query_params = query_params[:-(len(delimiter))]
     return base_url + query_params
 
-def scrape_lazada(driver: webdriver.Chrome, context: QueryContext) -> None:
+def scrape_lazada(driver: webdriver.Chrome, context: QueryContext, client: Client) -> PriceStats:
     full_query_url = get_full_query_url(BASE_URL_LAZADA, DELIMITER_LAZADA, context.query_terms)
     try:
         driver.get(full_query_url)
@@ -62,14 +79,20 @@ def scrape_lazada(driver: webdriver.Chrome, context: QueryContext) -> None:
                     price_value = float(item[1:])
                     prices.append(price_value)
 
-            print('Lazada: ')
-            print(f'Highest Price: {max(prices)}, \
-                    Lowest Price: {min(prices)}, \
-                    Median Price: {statistics.median(prices)}, \
-                    Mean Price: {statistics.mean(prices)}')
+            stats = PriceStats(
+                id=context.id,
+                lowest=min(prices), 
+                highest=max(prices), 
+                median=round(statistics.median(prices), 2), 
+                mean=statistics.mean(prices))
+            
+            print('Lazada:')
+            print(stats)
+            
+            return stats
                 
 
-def scrape_amazon(driver: webdriver.Chrome, context: QueryContext) -> None:
+def scrape_amazon(driver: webdriver.Chrome, context: QueryContext, client: Client) -> PriceStats:
     full_query_url = get_full_query_url(BASE_URL_AMAZON, DELIMITER_AMAZON, context.query_terms)
     try:
         driver.get(full_query_url)
@@ -95,19 +118,29 @@ def scrape_amazon(driver: webdriver.Chrome, context: QueryContext) -> None:
                 price_value = int(dollars[1:]) + (int(cents[:2]) / 100)
                 prices.append(price_value)
             
+            
+            
+            stats = PriceStats(
+                id=context.id,
+                lowest=min(prices), 
+                highest=max(prices), 
+                median=round(statistics.median(prices), 2), 
+                mean=statistics.mean(prices))
+            
             print('Amazon: ')
-            print(f'Highest Price: {max(prices)}, \
-                    Lowest Price: {min(prices)}, \
-                    Median Price: {statistics.median(prices)}, \
-                    Mean Price: {statistics.mean(prices)}')
-
+            print(stats)
+            
+            return stats
+            
 if __name__ == '__main__':
     try:
         client = get_db_connection(url=SUPABASE_URL, key=SUPABASE_KEY)
         context_list = get_query_context_list(client)
         driver: webdriver.Chrome = init_driver()
+        stats_list = []
         for ctx in context_list:
-            scrape_lazada(driver, ctx)
-            scrape_amazon(driver, ctx)
+            stats_list.append(scrape_lazada(driver, ctx, client))
+            stats_list.append(scrape_amazon(driver, ctx, client))
+        print(stats_list)
     finally:
         driver.quit()
