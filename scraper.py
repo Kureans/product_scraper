@@ -6,7 +6,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from supabase import create_client, Client
+
 import statistics
+import os
 
 BASE_URL_AMAZON = 'https://www.amazon.sg/s?k='
 DELIMITER_AMAZON = '+'
@@ -14,25 +16,29 @@ DELIMITER_AMAZON = '+'
 BASE_URL_LAZADA = 'https://www.lazada.sg/catalog/?q='
 DELIMITER_LAZADA = '%20'
 
-SUPABASE_URL = 'https://dggrityicqdeiwoszkxw.supabase.co'
-SUPABASE_KEY = 'dummy_key'
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-query_terms = ['whey', 'protein', '2.5kg']
+class QueryContext():
+    def __init__(self, query_terms: list[str], exclude_terms: list[str]) -> None:
+        self.query_terms = query_terms
+        self.exclude_terms = exclude_terms
 
 def get_db_connection() -> Client:
     client = create_client(SUPABASE_URL, SUPABASE_KEY)
     return client
 
-def get_query_terms_list(client: Client) -> list[list[str]]:
-    query_terms_list = []
+def get_query_context_list(client: Client) -> list[QueryContext]:
+    context_list = []
     query_strings = client.table('queries').select('query_string').execute().data
     if len(query_strings) == 0:
         print("No query strings in DB yet!")
         return
     for query in query_strings:
-        terms = query['query_string'].split(' ')
-        query_terms_list.append(terms)
-    return query_terms_list
+        query_terms = query.get('query_string', '').split(' ')
+        exclude_terms = query.get('exclude_string', '').split(' ')
+        context_list.append(QueryContext(query_terms, exclude_terms))
+    return context_list
 
 def init_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
@@ -48,8 +54,8 @@ def get_full_query_url(base_url, delimiter, query_terms):
     query_params = query_params[:-(len(delimiter))]
     return base_url + query_params
 
-def scrape_lazada(driver: webdriver.Chrome, query_terms: list) -> None:
-    full_query_url = get_full_query_url(BASE_URL_LAZADA, DELIMITER_LAZADA, query_terms)
+def scrape_lazada(driver: webdriver.Chrome, context: QueryContext) -> None:
+    full_query_url = get_full_query_url(BASE_URL_LAZADA, DELIMITER_LAZADA, context.query_terms)
     try:
         driver.get(full_query_url)
         WebDriverWait(driver, 10).until(
@@ -65,6 +71,8 @@ def scrape_lazada(driver: webdriver.Chrome, query_terms: list) -> None:
             print("Empty List!")
         else:
             prices = []
+            if len(context.exclude_terms) > 0:
+                elements = filter(lambda e: e not in context.exclude_terms, elements)
             for e in elements:
                 product_data = e.text.split('\n')
                 for item in product_data:
@@ -80,8 +88,8 @@ def scrape_lazada(driver: webdriver.Chrome, query_terms: list) -> None:
                     Mean Price: {statistics.mean(prices)}')
                 
 
-def scrape_amazon(driver: webdriver.Chrome, query_terms: list) -> None:
-    full_query_url = get_full_query_url(BASE_URL_AMAZON, DELIMITER_AMAZON, query_terms)
+def scrape_amazon(driver: webdriver.Chrome, context: QueryContext) -> None:
+    full_query_url = get_full_query_url(BASE_URL_AMAZON, DELIMITER_AMAZON, context.query_terms)
     try:
         driver.get(full_query_url)
         WebDriverWait(driver, 10).until(
@@ -114,10 +122,10 @@ def scrape_amazon(driver: webdriver.Chrome, query_terms: list) -> None:
 
 try:
     client = get_db_connection()
-    query_terms_list = get_query_terms_list(client)
+    context_list = get_query_context_list(client)
     driver: webdriver.Chrome = init_driver()
-    for query_terms in query_terms_list:
-        scrape_lazada(driver, query_terms)
-        scrape_amazon(driver, query_terms)
+    for ctx in context_list:
+        scrape_lazada(driver, ctx)
+        scrape_amazon(driver, ctx)
 finally:
     driver.quit()
