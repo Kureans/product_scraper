@@ -32,15 +32,17 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 class PriceStats():
-    def __init__(self, id, lowest, highest, median, mean) -> None:
+    def __init__(self, id, ecommerce_name, lowest, highest, median, mean) -> None:
         self.query_id = id
+        self.ecommerce_name = ecommerce_name
         self.lowest = lowest
         self.highest = highest
         self.median = median
         self.mean = mean
 
     def __repr__(self):
-        return f'Query ID: {self.query_id}, \
+        return f'   Taken from {self.ecommerce_name}: \
+                    Query ID: {self.query_id}, \
                     Highest Price: {self.highest}, \
                     Lowest Price: {self.lowest}, \
                     Median Price: {self.median}, \
@@ -50,6 +52,7 @@ class PriceStats():
 def price_stats_to_prices_row_entry(stat: PriceStats):
     return {
         'query_id': stat.query_id,
+        'ecommerce_name': stat.ecommerce_name,
         'query_dt': datetime.datetime.now(timezone.utc).isoformat(),
         'median_price': stat.median,
         'lowest_price': stat.lowest,
@@ -104,12 +107,12 @@ def scrape_lazada(driver: webdriver.Chrome, context: QueryContext, client: Clien
 
             stats = PriceStats(
                 id=context.id,
+                ecommerce_name='lazada',
                 lowest=min(prices), 
                 highest=max(prices), 
                 median=round(statistics.median(prices), 2), 
                 mean=statistics.mean(prices))
             
-            print('Lazada:')
             print(stats)
             
             return stats
@@ -145,12 +148,12 @@ def scrape_amazon(driver: webdriver.Chrome, context: QueryContext, client: Clien
                  
             stats = PriceStats(
                 id=context.id,
+                ecommerce_name='amazon',
                 lowest=min(prices), 
                 highest=max(prices), 
                 median=round(statistics.median(prices), 2), 
                 mean=statistics.mean(prices))
             
-            print('Amazon: ')
             print(stats)
             
             return stats
