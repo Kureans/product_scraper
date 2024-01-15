@@ -15,7 +15,7 @@ DELIMITER_AMAZON = '+'
 BASE_URL_LAZADA = 'https://www.lazada.sg/catalog/?q='
 DELIMITER_LAZADA = '%20'
 
-def get_full_query_url(base_url, delimiter, query_terms):
+def get_full_query_url(base_url: str, delimiter: str, query_terms: list[str]) -> str:
     query_params = ''
     for term in query_terms:
         query_params += f'{term}{delimiter}'
