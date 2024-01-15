@@ -1,9 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-from supabase import Client
 from dotenv import load_dotenv
 
 from query_context import get_query_context_list
@@ -33,6 +31,7 @@ if __name__ == '__main__':
 
         client = get_db_connection(url=SUPABASE_URL, key=SUPABASE_KEY)
         context_list = get_query_context_list(client)
+
         driver: webdriver.Chrome = init_driver(TIMEOUT_SECONDS)
 
         stats_list: list[PriceStats] = []
