@@ -22,14 +22,15 @@ def get_full_query_url(base_url: str, delimiter: str, query_terms: list[str]) ->
     query_params = query_params[:-(len(delimiter))]
     return base_url + query_params
 
+# Scraping logic designed for mobile driver
 def scrape_lazada(driver: webdriver.Chrome, context: QueryContext, timeout: int) -> PriceStats | None:
     full_query_url = get_full_query_url(BASE_URL_LAZADA, DELIMITER_LAZADA, context.query_terms)
     try:
         driver.get(full_query_url)
         WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.ID, 'products'))
+            EC.presence_of_element_located((By.CLASS_NAME, 'product-list'))
         )
-        
+
     except TimeoutException:
         print("Timeout Occured when scraping Lazada!")
 
@@ -63,7 +64,7 @@ def scrape_lazada(driver: webdriver.Chrome, context: QueryContext, timeout: int)
         
         return stats
                 
-
+# Scraping logic designed for web driver
 def scrape_amazon(driver: webdriver.Chrome, context: QueryContext, timeout: int) -> PriceStats | None:
     full_query_url = get_full_query_url(BASE_URL_AMAZON, DELIMITER_AMAZON, context.query_terms)
     try:
